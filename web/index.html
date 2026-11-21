@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>AI Code Assistant</title>
+
+<style>
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:'Segoe UI',sans-serif;
+}
+
+body{
+
+  background:#0f172a;
+
+  color:white;
+
+  height:100vh;
+
+  display:flex;
+
+  justify-content:center;
+
+  align-items:center;
+
+  padding:15px;
+
+}
+
+.container{
+
+  width:100%;
+
+  max-width:1200px;
+
+  height:95vh;
+
+  background:#111827;
+
+  border-radius:20px;
+
+  padding:20px;
+
+  display:flex;
+
+  flex-direction:column;
+
+}
+
+h1{
+
+  font-size:36px;
+
+  margin-bottom:18px;
+
+}
+
+.top-info{
+
+  display:flex;
+
+  gap:12px;
+
+  margin-bottom:15px;
+
+}
+
+.info-card{
+
+  flex:1;
+
+  background:#1e293b;
+
+  padding:15px;
+
+  border-radius:14px;
+
+}
+
+.info-card h3{
+
+  color:#94a3b8;
+
+  margin-bottom:6px;
+
+}
+
+.info-card p{
+
+  font-size:20px;
+
+  font-weight:600;
+
+}
+
+.online{
+
+  color:#22c55e;
+
+}
+
+.top{
+
+  display:flex;
+
+  gap:10px;
+
+  margin-bottom:15px;
+
+}
+
+input[type="file"]{
+
+  flex:1;
+
+  padding:12px;
+
+  background:#1e293b;
+
+  border:none;
+
+  border-radius:12px;
+
+  color:white;
+
+}
+
+button{
+
+  border:none;
+
+  background:#2563eb;
+
+  color:white;
+
+  padding:12px 18px;
+
+  border-radius:12px;
+
+  cursor:pointer;
+
+  font-size:14px;
+
+  font-weight:600;
+
+}
+
+.quick-actions{
+
+  display:flex;
+
+  gap:10px;
+
+  margin-bottom:15px;
+
+}
+
+.quick-actions button{
+
+  background:#334155;
+
+}
+
+.chat{
+
+  flex:1;
+
+  overflow-y:auto;
+
+  background:#0b1220;
+
+  border-radius:18px;
+
+  padding:35px;
+
+  display:flex;
+
+  flex-direction:column;
+
+  gap:30px;
+
+  margin-bottom:18px;
+
+  min-height:300px;
+
+  max-height:420px;
+
+  scroll-behavior:smooth;
+
+}
+
+.chat::-webkit-scrollbar{
+
+  width:10px;
+
+}
+
+.chat::-webkit-scrollbar-thumb{
+
+  background:#334155;
+
+  border-radius:20px;
+
+}
+
+.msg{
+
+  width:100%;
+
+  padding:35px;
+
+  border-radius:20px;
+
+  font-size:19px;
+
+  line-height:2.5;
+
+  white-space:pre-wrap;
+
+  word-break:break-word;
+
+  overflow-wrap:break-word;
+
+}
+
+.ai{
+
+  background:#1e293b;
+
+  color:#ffffff;
+
+  border:1px solid rgba(255,255,255,0.05);
+
+}
+
+.user{
+
+  background:#2563eb;
+
+  color:white;
+
+}
+
+.ask-box{
+
+  display:flex;
+
+  gap:12px;
+
+  margin-top:10px;
+
+}
+
+.ask-box textarea{
+
+  flex:1;
+
+  height:75px;
+
+  border:none;
+
+  resize:none;
+
+  background:#1e293b;
+
+  border-radius:14px;
+
+  padding:18px;
+
+  color:white;
+
+  font-size:16px;
+
+}
+
+.ask-box textarea::placeholder{
+
+  color:#94a3b8;
+
+}
+
+.ask-box textarea:focus{
+
+  outline:none;
+
+}
+
+.send-btn{
+
+  width:120px;
+
+  background:#22c55e;
+
+}
+
+.stats{
+
+  display:flex;
+
+  gap:12px;
+
+  margin-top:15px;
+
+}
+
+.stat-box{
+
+  flex:1;
+
+  background:#1e293b;
+
+  padding:15px;
+
+  border-radius:14px;
+
+  text-align:center;
+
+}
+
+.stat-box h2{
+
+  color:#60a5fa;
+
+  margin-bottom:5px;
+
+}
+
+.stat-box p{
+
+  color:#94a3b8;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>AI Code Assistant</h1>
+
+<div class="top-info">
+
+<div class="info-card">
+<h3>AI Model</h3>
+<p>DeepSeek Coder 1.3B</p>
+</div>
+
+<div class="info-card">
+<h3>Backend</h3>
+<p>Node.js + Express</p>
+</div>
+
+<div class="info-card">
+<h3>Status</h3>
+<p class="online">● Online</p>
+</div>
+
+</div>
+
+<div class="top">
+
+<input type="file" id="fileInput">
+
+<button onclick="uploadCode()">
+Upload
+</button>
+
+</div>
+
+<div class="quick-actions">
+
+<button onclick="setQuestion('Explain this code line by line')">
+Explain
+</button>
+
+<button onclick="setQuestion('Find bugs in this code')">
+Bugs
+</button>
+
+<button onclick="setQuestion('Optimize this code')">
+Optimize
+</button>
+
+<button onclick="setQuestion('Explain functions used')">
+Functions
+</button>
+
+</div>
+
+<div class="chat" id="chat">
+
+<div class="msg ai">
+Upload source code and ask questions to AI.
+</div>
+
+</div>
+
+<div class="ask-box">
+
+<textarea
+id="question"
+placeholder="Ask anything about the code..."
+></textarea>
+
+<button
+class="send-btn"
+onclick="askAI()"
+>
+Send
+</button>
+
+</div>
+
+<div class="stats">
+
+<div class="stat-box">
+<h2 id="msgCount">0</h2>
+<p>Messages</p>
+</div>
+
+<div class="stat-box">
+<h2 id="fileStatus">No</h2>
+<p>File Uploaded</p>
+</div>
+
+<div class="stat-box">
+<h2>AI</h2>
+<p>Powered Analysis</p>
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+let uploadedCode = "";
+
+function addMessage(text,type){
+
+  const chat =
+  document.getElementById('chat');
+
+  const div =
+  document.createElement('div');
+
+  div.className =
+  `msg ${type}`;
+
+  div.innerText = text;
+
+  chat.appendChild(div);
+
+  chat.scrollTop =
+  chat.scrollHeight;
+
+  updateStats();
+
+}
+
+function setQuestion(text){
+
+  document.getElementById('question').value =
+  text;
+
+}
+
+function updateStats(){
+
+  const totalMessages =
+  document.querySelectorAll('.msg').length;
+
+  document.getElementById('msgCount').innerText =
+  totalMessages;
+
+  if(uploadedCode !== ""){
+
+    document.getElementById('fileStatus').innerText =
+    'Yes';
+
+  }
+
+}
+
+async function uploadCode(){
+
+  const file =
+  document.getElementById('fileInput').files[0];
+
+  if(!file){
+
+    alert("Please select file");
+
+    return;
+
+  }
+
+  uploadedCode =
+  await file.text();
+
+  addMessage(
+    "✅ Code uploaded successfully.\n\nAnalyzing source code...",
+    "ai"
+  );
+
+  try{
+
+    const response =
+    await fetch('/upload',{
+
+      method:'POST',
+
+      headers:{
+        'Content-Type':'application/json'
+      },
+
+      body: JSON.stringify({
+
+        question:
+        "Explain this complete code line by line",
+
+        code: uploadedCode
+
+      })
+
+    });
+
+    const data =
+    await response.json();
+
+    addMessage(
+      data.explanation,
+      "ai"
+    );
+
+  }
+
+  catch(error){
+
+    console.log(error);
+
+    addMessage(
+      "❌ Error analyzing source code",
+      "ai"
+    );
+
+  }
+
+}
+
+async function askAI(){
+
+  const question =
+  document.getElementById('question').value;
+
+  if(question.trim() === ""){
+
+    alert("Please enter question");
+
+    return;
+
+  }
+
+  addMessage(question,'user');
+
+  document.getElementById('question').value = '';
+
+  addMessage(
+    "🤖 AI is thinking...",
+    "ai"
+  );
+
+  try{
+
+    const response =
+    await fetch('/upload',{
+
+      method:'POST',
+
+      headers:{
+        'Content-Type':'application/json'
+      },
+
+      body: JSON.stringify({
+
+        question: question,
+
+        code: uploadedCode
+
+      })
+
+    });
+
+    const data =
+    await response.json();
+
+    const aiMessages =
+    document.querySelectorAll('.ai');
+
+    aiMessages[
+    aiMessages.length - 1
+    ].innerText =
+    data.explanation;
+
+  }
+
+  catch(error){
+
+    console.log(error);
+
+    const aiMessages =
+    document.querySelectorAll('.ai');
+
+    aiMessages[
+    aiMessages.length - 1
+    ].innerText =
+    '❌ Error getting AI response';
+
+  }
+
+  updateStats();
+
+}
+
+</script>
+
+</body>
+
+</html>

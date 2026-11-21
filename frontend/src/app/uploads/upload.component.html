@@ -1,0 +1,46 @@
+<div style="padding:40px;background:#f4f4f4;min-height:100vh;">
+
+  <div style="background:white;padding:30px;border-radius:10px;width:70%;margin:auto;box-shadow:0 0 10px rgba(0,0,0,0.2);">
+
+    <h1 style="text-align:center;">
+      AI Source Code Explainer
+    </h1>
+
+    <br>
+
+    <input
+      type="file"
+      (change)="onFileChange($event)"
+    >
+
+    <br><br>
+
+    <button
+      (click)="uploadFile()"
+      style="padding:12px 20px;background:blue;color:white;border:none;border-radius:5px;cursor:pointer;"
+    >
+      Explain Code
+    </button>
+
+    <br><br>
+
+    <div *ngIf="loading">
+
+      AI is analyzing your source code...
+
+    </div>
+
+    <div
+      *ngIf="explanation"
+      style="background:#eee;padding:20px;border-radius:10px;margin-top:20px;"
+    >
+
+      <h2>AI Explanation</h2>
+
+      <pre style="white-space: pre-wrap;">{{ explanation }}</pre>
+
+    </div>
+
+  </div>
+
+</div>

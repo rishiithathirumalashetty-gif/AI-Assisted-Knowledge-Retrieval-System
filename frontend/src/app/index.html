@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <title>AI Source Code Explainer</title>
+
+  <style>
+
+    body{
+
+      margin:0;
+
+      padding:0;
+
+      background:#f4f4f4;
+
+      font-family:Arial;
+
+    }
+
+    .container{
+
+      width:70%;
+
+      margin:auto;
+
+      margin-top:50px;
+
+      background:white;
+
+      padding:30px;
+
+      border-radius:10px;
+
+      box-shadow:0 0 10px rgba(0,0,0,0.2);
+
+    }
+
+    h1{
+
+      text-align:center;
+
+    }
+
+    button{
+
+      padding:12px 20px;
+
+      background:blue;
+
+      color:white;
+
+      border:none;
+
+      border-radius:5px;
+
+      cursor:pointer;
+
+      margin-top:20px;
+
+    }
+
+    .result{
+
+      background:#eee;
+
+      padding:20px;
+
+      border-radius:10px;
+
+      margin-top:30px;
+
+    }
+
+    pre{
+
+      white-space:pre-wrap;
+
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>AI Source Code Explainer</h1>
+
+    <input type="file" id="fileInput">
+
+    <br>
+
+    <button onclick="uploadFile()">
+
+      Explain Code
+
+    </button>
+
+    <div class="result">
+
+      <h2>AI Explanation</h2>
+
+      <pre id="output">
+
+Waiting for file upload...
+
+      </pre>
+
+    </div>
+
+  </div>
+
+  <script>
+
+    async function uploadFile(){
+
+      const fileInput = document.getElementById('fileInput');
+
+      const file = fileInput.files[0];
+
+      if(!file){
+
+        alert("Please select a file");
+
+        return;
+
+      }
+
+      const formData = new FormData();
+
+      formData.append('file', file);
+
+      document.getElementById('output').innerText =
+      "AI is analyzing your source code...";
+
+      const response = await fetch(
+
+        'http://localhost:3000/upload',
+
+        {
+
+          method:'POST',
+
+          body:formData
+
+        }
+
+      );
+
+      const data = await response.json();
+
+      document.getElementById('output').innerText =
+      data.explanation;
+
+    }
+
+  </script>
+
+</body>
+
+</html>

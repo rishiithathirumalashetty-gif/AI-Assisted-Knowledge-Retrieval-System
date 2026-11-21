@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+config.js
+/uploads/
+/backend/uploads/
+.angular/
+*.log
+.DS_Store
+# Knowledge documents are local to each user; add your own files here
+backend/knowledge/*
+!backend/knowledge/.gitkeep
