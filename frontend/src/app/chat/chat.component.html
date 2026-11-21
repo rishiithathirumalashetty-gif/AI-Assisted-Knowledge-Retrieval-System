@@ -1,0 +1,30 @@
+<section>
+  <p class="hint">Answers come only from the files in the backend's <code>knowledge</code> folder. If nothing matches, the assistant says so.</p>
+
+  <form (ngSubmit)="ask()">
+    <textarea name="question" rows="3" [(ngModel)]="question" [disabled]="loading"
+              placeholder="Ask a question about your documents…" aria-label="Your question"
+              (keydown.control.enter)="ask()"></textarea>
+    <div class="row">
+      <div class="examples">
+        <button type="button" *ngFor="let e of examples" (click)="useExample(e)">{{ e }}</button>
+      </div>
+      <button type="submit" class="primary" [disabled]="loading">
+        <span *ngIf="!loading">Ask</span>
+        <span *ngIf="loading" class="busy"><i class="spinner"></i>Thinking…</span>
+      </button>
+    </div>
+  </form>
+
+  <p class="error" *ngIf="error" role="alert">{{ error }}</p>
+
+  <div class="result" *ngIf="segments.length">
+    <h2>Answer</h2>
+    <p class="sources" *ngIf="sources.length">Sources: <span *ngFor="let s of sources">{{ s }}</span></p>
+    <p class="sources" *ngIf="!sources.length">No matching documents were found in the knowledge folder.</p>
+    <ng-container *ngFor="let s of segments">
+      <pre class="code" *ngIf="s.type === 'code'">{{ s.content }}</pre>
+      <p class="text" *ngIf="s.type === 'text'">{{ s.content }}</p>
+    </ng-container>
+  </div>
+</section>

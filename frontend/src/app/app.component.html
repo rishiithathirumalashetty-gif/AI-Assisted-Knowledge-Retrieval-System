@@ -1,1 +1,23 @@
-<app-upload></app-upload>
+<div class="page">
+  <header class="top">
+    <div>
+      <h1>AI Source Code Explainer</h1>
+      <p class="sub">Upload a file or ask a question. A local Ollama model answers, so your code stays on your machine.</p>
+    </div>
+    <button class="status" [ngClass]="status" (click)="checkHealth()" type="button" title="Click to re-check">
+      <span class="dot"></span>{{ statusText }}
+    </button>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" [attr.aria-selected]="tab === 'explain'" [class.active]="tab === 'explain'" (click)="tab = 'explain'">Explain a file</button>
+    <button type="button" role="tab" [attr.aria-selected]="tab === 'ask'" [class.active]="tab === 'ask'" (click)="tab = 'ask'">Ask the knowledge base</button>
+  </div>
+
+  <main class="card">
+    <app-upload [hidden]="tab !== 'explain'"></app-upload>
+    <app-chat [hidden]="tab !== 'ask'"></app-chat>
+  </main>
+
+  <footer>Built with Angular, Node.js and Ollama</footer>
+</div>

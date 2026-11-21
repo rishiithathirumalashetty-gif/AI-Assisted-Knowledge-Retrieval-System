@@ -1,46 +1,36 @@
-<div style="padding:40px;background:#f4f4f4;min-height:100vh;">
+<section>
+  <label class="drop" [class.dragging]="dragging" [class.has-file]="selectedFile"
+         (dragover)="onDragOver($event)" (dragleave)="dragging = false" (drop)="onDrop($event)">
+    <input type="file" (change)="onFileChange($event)" [disabled]="loading" aria-label="Choose a source file">
+    <ng-container *ngIf="!selectedFile">
+      <strong>Drop a source file here</strong>
+      <span>or click to browse · text and code files up to 2 MB</span>
+    </ng-container>
+    <ng-container *ngIf="selectedFile">
+      <strong>{{ selectedFile.name }}</strong>
+      <span>{{ formatSize(selectedFile.size) }} · ready to explain</span>
+    </ng-container>
+  </label>
 
-  <div style="background:white;padding:30px;border-radius:10px;width:70%;margin:auto;box-shadow:0 0 10px rgba(0,0,0,0.2);">
-
-    <h1 style="text-align:center;">
-      AI Source Code Explainer
-    </h1>
-
-    <br>
-
-    <input
-      type="file"
-      (change)="onFileChange($event)"
-    >
-
-    <br><br>
-
-    <button
-      (click)="uploadFile()"
-      style="padding:12px 20px;background:blue;color:white;border:none;border-radius:5px;cursor:pointer;"
-    >
-      Explain Code
+  <div class="actions">
+    <button type="button" class="primary" (click)="uploadFile()" [disabled]="loading || !selectedFile">
+      <span *ngIf="!loading">Explain code</span>
+      <span *ngIf="loading" class="busy"><i class="spinner"></i>{{ stage === 'uploading' ? 'Uploading…' : 'Analysing with the AI model…' }}</span>
     </button>
-
-    <br><br>
-
-    <div *ngIf="loading">
-
-      AI is analyzing your source code...
-
-    </div>
-
-    <div
-      *ngIf="explanation"
-      style="background:#eee;padding:20px;border-radius:10px;margin-top:20px;"
-    >
-
-      <h2>AI Explanation</h2>
-
-      <pre style="white-space: pre-wrap;">{{ explanation }}</pre>
-
-    </div>
-
+    <button type="button" class="ghost" *ngIf="selectedFile && !loading" (click)="clearFile()">Clear</button>
   </div>
 
-</div>
+  <p class="error" *ngIf="error" role="alert">{{ error }}</p>
+
+  <div class="result" *ngIf="segments.length">
+    <div class="result-head">
+      <h2>Explanation</h2>
+      <button type="button" class="ghost small" (click)="copyAnswer()">{{ copied ? 'Copied' : 'Copy' }}</button>
+    </div>
+    <p class="note" *ngIf="truncated">Only the first 12,000 characters of this file were sent to the model.</p>
+    <ng-container *ngFor="let s of segments">
+      <pre class="code" *ngIf="s.type === 'code'">{{ s.content }}</pre>
+      <p class="text" *ngIf="s.type === 'text'">{{ s.content }}</p>
+    </ng-container>
+  </div>
+</section>
