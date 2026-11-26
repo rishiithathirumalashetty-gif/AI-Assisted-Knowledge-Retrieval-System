@@ -3,10 +3,25 @@ import { Component } from '@angular/core';
 import { ApiService } from '../api.service';
 import { AnswerSegment, errorMessage, splitAnswer } from '../answer-format';
 
-/** Must match ALLOWED_EXTENSIONS and MAX_UPLOAD_BYTES in backend/server.js. */
-const ALLOWED = ['.c', '.h', '.cpp', '.hpp', '.cc', '.cs', '.java', '.js', '.ts', '.py', '.go', '.rs',
-  '.html', '.css', '.json', '.xml', '.yml', '.yaml', '.sql', '.sh', '.s', '.asm', '.ino', '.md', '.txt'];
-const MAX_BYTES = 2 * 1024 * 1024;
+/** Must match ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES and MAX_PDF_BYTES in backend/server.js. */
+export const ALLOWED = ['.c', '.h', '.cpp', '.hpp', '.cc', '.cs', '.java', '.js', '.ts', '.py', '.go', '.rs',
+  '.html', '.css', '.json', '.xml', '.yml', '.yaml', '.sql', '.sh', '.s', '.asm', '.ino', '.md', '.txt', '.pdf'];
+export const MAX_BYTES = 2 * 1024 * 1024;
+export const MAX_PDF_BYTES = 10 * 1024 * 1024;
+
+/** Returns an error message, or '' when the file can be uploaded. */
+export function validateFile(file: File): string {
+  const dot = file.name.lastIndexOf('.');
+  const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : '';
+  if (!ALLOWED.includes(ext)) {
+    return `"${ext || 'no extension'}" files are not supported. Choose a PDF, text or source-code file.`;
+  }
+  const limit = ext === '.pdf' ? MAX_PDF_BYTES : MAX_BYTES;
+  if (file.size > limit) {
+    return `That file is larger than ${limit / 1024 / 1024} MB. Choose a smaller one.`;
+  }
+  return '';
+}
 
 /** Upload a source file and show the model's explanation of it. */
 @Component({
@@ -20,6 +35,7 @@ export class UploadComponent {
   segments: AnswerSegment[] = [];
   rawAnswer = '';
   truncated = false;
+  sources: string[] = [];
   loading = false;
   stage: 'uploading' | 'analysing' | '' = '';
   error = '';
@@ -56,16 +72,8 @@ export class UploadComponent {
     this.selectedFile = null;
     if (!file) { return; }
 
-    const dot = file.name.lastIndexOf('.');
-    const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : '';
-    if (!ALLOWED.includes(ext)) {
-      this.error = `"${ext || 'no extension'}" files are not supported. Choose a text or source-code file.`;
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      this.error = 'That file is larger than 2 MB. Choose a smaller one.';
-      return;
-    }
+    this.error = validateFile(file);
+    if (this.error) { return; }
     this.selectedFile = file;
   }
 
@@ -81,6 +89,7 @@ export class UploadComponent {
 
     this.error = '';
     this.segments = [];
+    this.sources = [];
     this.rawAnswer = '';
     this.loading = true;
     this.stage = 'uploading';
@@ -94,6 +103,7 @@ export class UploadComponent {
             this.rawAnswer = result.answer;
             this.segments = splitAnswer(result.answer);
             this.truncated = result.truncated;
+            this.sources = result.sources || [];
             this.finish();
           },
           (err) => {
@@ -118,7 +128,8 @@ export class UploadComponent {
   }
 
   formatSize(bytes: number): string {
-    return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024) { return `${bytes} B`; }
+    return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }
 
   private finish(): void {

@@ -99,9 +99,12 @@ test("keyword search finds the right document", async () => {
     assert.ok(!lastPrompt.includes("analog voltage"));
 });
 
-test("unanswerable question tells the model the information is missing", async () => {
-    await post("/chat", { question: "quantum gravity zebra" });
-    assert.ok(lastPrompt.includes("Information not available in institutional database."));
+test("unanswerable question says the information is missing without asking the model", async () => {
+    lastPrompt = "";
+    const body = await (await post("/chat", { question: "quantum gravity zebra" })).json();
+    assert.strictEqual(body.answer, "Information not available in institutional database.");
+    assert.strictEqual(body.found, false);
+    assert.strictEqual(lastPrompt, "", "the model is not called when nothing was retrieved");
 });
 
 test("chat reports 503 when Ollama is down", async () => {

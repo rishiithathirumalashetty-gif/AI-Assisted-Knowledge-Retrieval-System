@@ -1,17 +1,44 @@
 <section>
-  <p class="hint">Answers come only from the files in the backend's <code>knowledge</code> folder. If nothing matches, the assistant says so.</p>
+  <div class="kb">
+    <div class="kb-head">
+      <div>
+        <h2>Knowledge base</h2>
+        <p class="hint">Add PDF or text documents. They are split into chunks, embedded with a local model and searched by meaning.</p>
+      </div>
+      <label class="upload-btn" [class.disabled]="uploading">
+        <input type="file" multiple (change)="addDocuments($event)" [disabled]="uploading" aria-label="Add documents to the knowledge base">
+        <span *ngIf="!uploading">+ Add documents</span>
+        <span *ngIf="uploading" class="busy dark"><i class="spinner dark"></i>Indexing…</span>
+      </label>
+    </div>
+
+    <ul class="doc-list" *ngIf="files.length">
+      <li *ngFor="let f of files">
+        <span class="doc-name">{{ f.name }}</span>
+        <span class="doc-meta" [class.warn]="!f.chunks">{{ !f.indexed ? 'not indexed' : f.chunks ? f.chunks + (f.chunks === 1 ? ' chunk' : ' chunks') : 'no text found' }}</span>
+      </li>
+    </ul>
+    <p class="hint" *ngIf="!files.length">No documents yet. Add a PDF or text file to start.</p>
+
+    <button type="button" class="link" *ngIf="unindexedCount" (click)="reindex()" [disabled]="reindexing">
+      {{ reindexing ? 'Indexing…' : 'Index ' + unindexedCount + ' unindexed document(s)' }}
+    </button>
+    <p class="ok" *ngIf="docMessage" role="status">{{ docMessage }}</p>
+    <p class="error" *ngIf="docError" role="alert">{{ docError }}</p>
+  </div>
 
   <form (ngSubmit)="ask()">
     <textarea name="question" rows="3" [(ngModel)]="question" [disabled]="loading"
               placeholder="Ask a question about your documents…" aria-label="Your question"
               (keydown.control.enter)="ask()"></textarea>
+    <div class="counter" [class.over]="question.length > maxQuestion">{{ question.length }} / {{ maxQuestion }}</div>
     <div class="row">
       <div class="examples">
         <button type="button" *ngFor="let e of examples" (click)="useExample(e)">{{ e }}</button>
       </div>
       <button type="submit" class="primary" [disabled]="loading">
         <span *ngIf="!loading">Ask</span>
-        <span *ngIf="loading" class="busy"><i class="spinner"></i>Thinking…</span>
+        <span *ngIf="loading" class="busy"><i class="spinner"></i>Searching documents…</span>
       </button>
     </div>
   </form>
@@ -19,12 +46,28 @@
   <p class="error" *ngIf="error" role="alert">{{ error }}</p>
 
   <div class="result" *ngIf="segments.length">
-    <h2>Answer</h2>
-    <p class="sources" *ngIf="sources.length">Sources: <span *ngFor="let s of sources">{{ s }}</span></p>
-    <p class="sources" *ngIf="!sources.length">No matching documents were found in the knowledge folder.</p>
+    <div class="result-head">
+      <h2>Answer</h2>
+      <span class="badge" *ngIf="retrieval === 'semantic'" title="Context found by vector similarity">Semantic search</span>
+      <span class="badge muted" *ngIf="retrieval === 'keyword'" title="Embeddings unavailable, keyword search was used">Keyword search</span>
+    </div>
+    <p class="notice" *ngIf="!found && retrieval !== 'conversation'">
+      This information was not found in the uploaded documents, so the answer is not grounded in your files.
+    </p>
     <ng-container *ngFor="let s of segments">
       <pre class="code" *ngIf="s.type === 'code'">{{ s.content }}</pre>
       <p class="text" *ngIf="s.type === 'text'">{{ s.content }}</p>
     </ng-container>
+
+    <div class="refs" *ngIf="references.length">
+      <h3>Sources</h3>
+      <ol>
+        <li *ngFor="let r of references">
+          <div class="ref-head"><strong>{{ r.file }}</strong> · chunk {{ r.chunk }} <span class="score">{{ percent(r.score) }} match</span></div>
+          <p class="preview">{{ r.preview }}…</p>
+        </li>
+      </ol>
+    </div>
+    <p class="sources" *ngIf="!references.length && sources.length">Sources: <span *ngFor="let s of sources">{{ s }}</span></p>
   </div>
 </section>
