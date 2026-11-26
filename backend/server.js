@@ -4,16 +4,22 @@
  * A small Express API that sits between the Angular frontend and a locally
  * running Ollama model.
  *
- *   POST /upload  save a text/code file into the knowledge folder
- *   POST /chat    answer a question (optionally explaining one uploaded file)
- *   GET  /files   list the files in the knowledge folder
- *   GET  /health  report whether the server and Ollama are reachable
+ *   POST /upload   save a document (PDF, text or code) and index it for RAG
+ *   POST /chat     answer a question (optionally explaining one uploaded file)
+ *   GET  /files    list the files in the knowledge folder
+ *   POST /reindex  rebuild the vector index for every file in the knowledge folder
+ *   GET  /health   report whether the server and Ollama are reachable
  *
- * Retrieval is plain keyword matching over 5,000-character chunks. It is not
- * semantic search. Everything runs locally, so no document leaves the machine.
+ * Retrieval-Augmented Generation (see rag.js): documents are split into overlapping
+ * chunks, embedded with a local Ollama embedding model and stored in a JSON vector
+ * store. A question is embedded the same way and the most similar chunks are given
+ * to the chat model as context. If no embeddings are available (embedding model not
+ * pulled, Ollama down while uploading) the server falls back to keyword search.
+ * Everything runs locally, so no document leaves the machine.
  *
  * Configuration (all optional) is read from environment variables, see
- * .env.example: PORT, OLLAMA_URL, OLLAMA_MODEL, CORS_ORIGIN, KNOWLEDGE_DIR.
+ * .env.example: PORT, OLLAMA_URL, OLLAMA_MODEL, OLLAMA_EMBED_MODEL, CORS_ORIGIN,
+ * KNOWLEDGE_DIR, VECTOR_STORE, RAG_TOP_K, RAG_MIN_SCORE.
  */
 "use strict";
 
@@ -23,6 +29,7 @@ const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
+const { RagStore, extractText } = require("./rag");
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -32,8 +39,13 @@ const OLLAMA_URL = (process.env.OLLAMA_URL || "http://127.0.0.1:11434").replace(
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5-coder:7b";
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:4200";
 const KNOWLEDGE_DIR = process.env.KNOWLEDGE_DIR || path.join(__dirname, "knowledge");
+const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
+const VECTOR_STORE = process.env.VECTOR_STORE || path.join(KNOWLEDGE_DIR, ".vector-store.json");
+const RAG_TOP_K = Number(process.env.RAG_TOP_K) || 4;            // chunks sent to the model
+const RAG_MIN_SCORE = Number(process.env.RAG_MIN_SCORE) || 0.3;  // minimum cosine similarity
 
-const MAX_UPLOAD_BYTES = 2 * 1024 * 1024; // 2 MB per file
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;     // 2 MB per text/code file
+const MAX_PDF_BYTES = 10 * 1024 * 1024;       // 10 MB per PDF
 const CHUNK_SIZE = 5000;                  // characters per searchable chunk
 const TOP_CHUNKS = 3;                     // best-matching chunks sent to the model
 const MAX_FILE_CONTEXT = 12000;           // characters of an uploaded file sent to the model
@@ -44,7 +56,7 @@ const OLLAMA_TIMEOUT_MS = 120000;
 const ALLOWED_EXTENSIONS = new Set([
     ".c", ".h", ".cpp", ".hpp", ".cc", ".cs", ".java", ".js", ".ts", ".py", ".go", ".rs",
     ".html", ".css", ".json", ".xml", ".yml", ".yaml", ".sql", ".sh", ".s", ".asm", ".ino",
-    ".md", ".txt"
+    ".md", ".txt", ".pdf"
 ]);
 
 const STOP_WORDS = new Set([
@@ -57,6 +69,13 @@ const STOP_WORDS = new Set([
 if (!fs.existsSync(KNOWLEDGE_DIR)) {
     fs.mkdirSync(KNOWLEDGE_DIR, { recursive: true });
 }
+
+const rag = new RagStore({
+    knowledgeDir: KNOWLEDGE_DIR,
+    storePath: VECTOR_STORE,
+    ollamaUrl: OLLAMA_URL,
+    embedModel: OLLAMA_EMBED_MODEL
+});
 
 const app = express();
 app.use(cors({ origin: CORS_ORIGIN }));
@@ -80,7 +99,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+    limits: { fileSize: MAX_PDF_BYTES, files: 1 },
     fileFilter: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
         if (!ALLOWED_EXTENSIONS.has(ext)) {
@@ -94,16 +113,47 @@ const upload = multer({
     }
 });
 
-app.post("/upload", upload.single("file"), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: "No file received. Send it in the form field named 'file'." });
+app.post("/upload", upload.single("file"), async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file received. Send it in the form field named 'file'." });
+        }
+        const isPdf = path.extname(req.file.filename).toLowerCase() === ".pdf";
+        if (!isPdf && req.file.size > MAX_UPLOAD_BYTES) {
+            fs.unlinkSync(req.file.path);
+            return res.status(413).json({ error: `File is too large (maximum ${MAX_UPLOAD_BYTES / 1024 / 1024} MB).` });
+        }
+
+        // Index the document for semantic search. If that fails (for example the embedding
+        // model is not pulled) the file is still saved and keyword search keeps working.
+        let indexed = false, chunks = 0, indexError;
+        try {
+            const result = await rag.indexFile(req.file.filename);
+            indexed = true;
+            chunks = result.chunks;
+            if (result.chunks === 0) {
+                indexed = false;
+                indexError = isPdf
+                    ? "No text could be extracted from this PDF (it may be a scanned image)."
+                    : "The file is empty, so there is nothing to search.";
+            }
+        } catch (err) {
+            indexError = err.message;
+            console.error(`Indexing ${req.file.filename} failed: ${err.message}`);
+        }
+
+        // Return the stored name: it may differ from the original after sanitising.
+        res.json({
+            message: "File uploaded successfully",
+            fileName: req.file.filename,
+            size: req.file.size,
+            indexed,
+            chunks,
+            ...(indexError ? { indexError } : {})
+        });
+    } catch (err) {
+        next(err);
     }
-    // Return the stored name: it may differ from the original after sanitising.
-    res.json({
-        message: "File uploaded successfully",
-        fileName: req.file.filename,
-        size: req.file.size
-    });
 });
 
 // ---------------------------------------------------------------------------
@@ -127,10 +177,16 @@ function searchKnowledge(question) {
     const scored = [];
 
     for (const file of fs.readdirSync(KNOWLEDGE_DIR)) {
-        if (file.startsWith(".")) continue; // skips .gitkeep
+        if (file.startsWith(".")) continue; // skips .gitkeep and the vector store
         let data;
         try {
-            data = fs.readFileSync(path.join(KNOWLEDGE_DIR, file), "utf8");
+            if (path.extname(file).toLowerCase() === ".pdf") {
+                const entry = rag.files[file];
+                if (!entry) continue;
+                data = entry.chunks.map((c) => c.text).join("\n");
+            } else {
+                data = fs.readFileSync(path.join(KNOWLEDGE_DIR, file), "utf8");
+            }
         } catch (err) {
             console.error(`Could not read ${file}: ${err.message}`);
             continue;
@@ -166,6 +222,7 @@ STRICT RULES:
 2. NEVER use internet knowledge.
 3. If unavailable say:
    "Information not available in institutional database."
+4. At the end, list the FILE NAMES you used under the heading "Sources".
 
 For EVERY answer provide:
 
@@ -192,6 +249,55 @@ USER QUESTION
 
 ${question}
 `;
+}
+
+/** Small talk such as greetings or thanks: answered normally, without documents. */
+function buildConversationPrompt(question) {
+    return `
+You are a friendly AI assistant for a document question-answering app.
+Reply briefly and naturally to the message below. If it asks for facts, remind the user
+that you answer questions from the documents they upload.
+
+MESSAGE: ${question}
+`;
+}
+
+const NOT_AVAILABLE = "Information not available in institutional database.";
+
+const SMALL_TALK = /^\s*(hi|hello|hey|hii+|good (morning|afternoon|evening)|thanks|thank you|thx|ok(ay)?|bye|goodbye|how are you|who are you|what can you do)\b[\s!.?]*$/i;
+
+/** Format retrieved chunks as numbered context blocks. */
+function formatChunks(chunks) {
+    return chunks
+        .map((c, i) => `==================================================\n[${i + 1}] FILE NAME: ${c.file} (chunk ${c.chunk})\n==================================================\n\n${c.text}\n`)
+        .join("\n");
+}
+
+/**
+ * Find context for a question. Semantic (vector) search is tried first; keyword search is
+ * the fallback when no embeddings exist or the embedding model cannot be reached.
+ */
+async function retrieve(question) {
+    if (rag.chunkCount > 0) {
+        try {
+            const hits = await rag.search(question, RAG_TOP_K, RAG_MIN_SCORE);
+            return {
+                mode: "semantic",
+                context: formatChunks(hits),
+                sources: [...new Set(hits.map((h) => h.file))],
+                references: hits.map((h) => ({
+                    file: h.file,
+                    chunk: h.chunk,
+                    score: Math.round(h.score * 1000) / 1000,
+                    preview: h.text.slice(0, 200)
+                }))
+            };
+        } catch (err) {
+            console.error(`Semantic search unavailable, using keyword search: ${err.message}`);
+        }
+    }
+    const found = searchKnowledge(question);
+    return { mode: "keyword", context: found.context, sources: found.sources, references: [] };
 }
 
 /** Explaining one uploaded file. */
@@ -270,12 +376,20 @@ app.post("/chat", async (req, res, next) => {
             return res.status(400).json({ error: `Question is too long (maximum ${MAX_QUESTION_LENGTH} characters).` });
         }
 
-        const found = searchKnowledge(question);
+        const hasFile = fileName !== undefined && fileName !== null && fileName !== "";
+
+        // Greetings and thanks get a normal conversational reply.
+        if (!hasFile && SMALL_TALK.test(question)) {
+            const answer = await askOllama(buildConversationPrompt(question));
+            return res.json({ answer, sources: [], references: [], truncated: false, found: true, retrieval: "conversation" });
+        }
+
+        const found = await retrieve(question);
         let prompt;
         let truncated = false;
         const sources = [...found.sources];
 
-        if (fileName !== undefined && fileName !== null && fileName !== "") {
+        if (hasFile) {
             // Explain one specific uploaded file.
             if (typeof fileName !== "string") {
                 return res.status(400).json({ error: "'fileName' must be a string." });
@@ -285,19 +399,36 @@ app.post("/chat", async (req, res, next) => {
             if (!fs.existsSync(filePath)) {
                 return res.status(404).json({ error: `Uploaded file "${safeName}" was not found. Upload it again.` });
             }
-            const full = fs.readFileSync(filePath, "utf8");
+            const full = await extractText(filePath);
             truncated = full.length > MAX_FILE_CONTEXT;
             prompt = buildExplainPrompt(safeName, full.substring(0, MAX_FILE_CONTEXT), found.context, question);
             if (!sources.includes(safeName)) sources.unshift(safeName);
+        } else if (!found.context) {
+            // Nothing relevant was retrieved. Answer directly instead of asking the model,
+            // so it cannot make up an answer that looks document-based.
+            return res.json({
+                answer: NOT_AVAILABLE,
+                sources: [],
+                references: [],
+                truncated: false,
+                found: false,
+                retrieval: found.mode
+            });
         } else {
-            // Question answering over the knowledge folder.
-            const context = found.context || "Information not available in institutional database.";
-            prompt = buildQuestionPrompt(context, question);
+            // Question answering over the retrieved document chunks.
+            prompt = buildQuestionPrompt(found.context, question);
         }
 
-        console.log(`QUESTION: ${question.slice(0, 120)}`);
+        console.log(`QUESTION (${found.mode}): ${question.slice(0, 120)}`);
         const answer = await askOllama(prompt);
-        res.json({ answer, sources, truncated });
+        res.json({
+            answer,
+            sources,
+            references: found.references,
+            truncated,
+            found: hasFile || Boolean(found.context),
+            retrieval: found.mode
+        });
     } catch (err) {
         next(err);
     }
@@ -310,8 +441,17 @@ app.post("/chat", async (req, res, next) => {
 app.get("/files", (req, res) => {
     const files = fs.readdirSync(KNOWLEDGE_DIR)
         .filter((f) => !f.startsWith("."))
-        .map((name) => ({ name, size: fs.statSync(path.join(KNOWLEDGE_DIR, name)).size }));
+        .map((name) => ({ name, size: fs.statSync(path.join(KNOWLEDGE_DIR, name)).size, chunks: rag.chunksFor(name) }));
     res.json({ files });
+});
+
+app.post("/reindex", async (req, res, next) => {
+    try {
+        const result = await rag.sync();
+        res.json({ ...result, totalChunks: rag.chunkCount });
+    } catch (err) {
+        next(err);
+    }
 });
 
 app.get("/health", async (req, res) => {
@@ -320,7 +460,7 @@ app.get("/health", async (req, res) => {
         await axios.get(`${OLLAMA_URL}/api/tags`, { timeout: 1500 });
         ollama = "reachable";
     } catch (err) { /* reported as unreachable */ }
-    res.json({ status: "ok", model: OLLAMA_MODEL, ollama });
+    res.json({ status: "ok", model: OLLAMA_MODEL, embedModel: OLLAMA_EMBED_MODEL, ollama, indexedChunks: rag.chunkCount });
 });
 
 // ---------------------------------------------------------------------------
@@ -331,7 +471,7 @@ app.get("/health", async (req, res) => {
 app.use((err, req, res, next) => {
     if (err instanceof multer.MulterError) {
         const message = err.code === "LIMIT_FILE_SIZE"
-            ? `File is too large (maximum ${MAX_UPLOAD_BYTES / 1024 / 1024} MB).`
+            ? `File is too large (maximum ${MAX_PDF_BYTES / 1024 / 1024} MB for PDFs).`
             : err.message;
         return res.status(err.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({ error: message });
     }
@@ -345,7 +485,16 @@ app.use((err, req, res, next) => {
 
 // Start listening only when run directly, so tests can import the app.
 if (require.main === module) {
-    app.listen(PORT, () => console.log(`Server running on port ${PORT} (model: ${OLLAMA_MODEL})`));
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT} (model: ${OLLAMA_MODEL}, embeddings: ${OLLAMA_EMBED_MODEL})`);
+        // Index files that were copied into the knowledge folder while the server was stopped.
+        rag.sync()
+            .then((r) => {
+                if (r.indexed.length) console.log(`Indexed ${r.indexed.length} file(s) for semantic search.`);
+                r.errors.forEach((e) => console.error(`Could not index ${e.fileName}: ${e.error}`));
+            })
+            .catch((err) => console.error(`Indexing on startup failed: ${err.message}`));
+    });
 }
 
-module.exports = { app, searchKnowledge, sanitizeFileName, keywords };
+module.exports = { app, rag, searchKnowledge, sanitizeFileName, keywords };
