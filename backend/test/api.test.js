@@ -11,6 +11,16 @@ const path = require("path");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "kb-"));
 process.env.KNOWLEDGE_DIR = tmp;
 
+// Behaves like a grounded model: answers with the first sentence of the first excerpt.
+// With fabricate=true it answers from "outside knowledge" instead.
+let fabricate = false;
+function fakeAnswer(prompt) {
+    if (!String(prompt || "").includes("DOCUMENT EXCERPTS")) return "FAKE-ANSWER";
+    if (fabricate) return "SPI uses a master and slave with a separate clock line and chip select.\n\nSources:\ncan-bus.pdf";
+    const excerpt = prompt.split(/FILE NAME: [^\n]*\n=+\n\n/)[1] || "";
+    const firstLine = excerpt.split("\n").find((l) => l.trim().length > 20) || excerpt;
+    return `${firstLine.trim()}\n\nSources:\nmade-up-file.pdf`;
+}
 let lastPrompt = "";
 const fakeOllama = http.createServer((req, res) => {
     let body = "";
@@ -19,7 +29,7 @@ const fakeOllama = http.createServer((req, res) => {
         res.setHeader("Content-Type", "application/json");
         if (req.url === "/api/tags") return res.end(JSON.stringify({ models: [] }));
         lastPrompt = JSON.parse(body).prompt;
-        res.end(JSON.stringify({ response: "FAKE-ANSWER" }));
+        res.end(JSON.stringify({ response: fakeAnswer(lastPrompt) }));
     });
 });
 
@@ -102,7 +112,7 @@ test("keyword search finds the right document", async () => {
 test("unanswerable question says the information is missing without asking the model", async () => {
     lastPrompt = "";
     const body = await (await post("/chat", { question: "quantum gravity zebra" })).json();
-    assert.strictEqual(body.answer, "Information not available in institutional database.");
+    assert.strictEqual(body.answer, "Information not available in the uploaded documents.");
     assert.strictEqual(body.found, false);
     assert.strictEqual(lastPrompt, "", "the model is not called when nothing was retrieved");
 });

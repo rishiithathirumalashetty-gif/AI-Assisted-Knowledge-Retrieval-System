@@ -30,6 +30,7 @@ const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
 const { RagStore, extractText } = require("./rag");
+const { verifyAnswer, citedChunks } = require("./grounding");
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -218,7 +219,11 @@ function searchKnowledge(question) {
     const context = best
         .map((c) => `==================================================\nFILE NAME: ${c.file}\n==================================================\n\n${c.chunk}\n`)
         .join("\n");
-    return { context, sources: [...new Set(best.map((c) => c.file))] };
+    return {
+        context,
+        sources: [...new Set(best.map((c) => c.file))],
+        hits: best.map((c) => ({ file: c.file, chunk: 0, score: c.score, text: c.chunk }))
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +245,7 @@ STRICT RULES:
    "${NOT_AVAILABLE}"
 3. If they answer only part of the question, answer that part and say what is missing.
 4. Keep the answer short: a direct answer first, then a brief explanation (at most 150 words).
-5. End with a line "Sources:" followed by the file names you used.
+5. Do not list sources; the application shows them from its own retrieval results.
 
 ==================================================
 DOCUMENT EXCERPTS
@@ -267,9 +272,41 @@ MESSAGE: ${question}
 `;
 }
 
-const NOT_AVAILABLE = "Information not available in institutional database.";
+const NOT_AVAILABLE = "Information not available in the uploaded documents.";
 
 const SMALL_TALK = /^\s*(hi|hello|hey|hii+|good (morning|afternoon|evening)|thanks|thank you|thx|ok(ay)?|bye|goodbye|how are you|who are you|what can you do)\b[\s!.?]*$/i;
+
+function toReferences(hits) {
+    return hits.map((h) => ({
+        file: h.file,
+        chunk: h.chunk,
+        score: Math.round(h.score * 1000) / 1000,
+        preview: h.text.slice(0, 200)
+    }));
+}
+
+/**
+ * Check a generated answer against the retrieved chunks. Unsupported sentences are removed,
+ * the model's own "Sources" list is replaced by the chunks the answer really uses, and an
+ * answer with no supported sentence becomes NOT_AVAILABLE.
+ */
+async function groundAnswer(answer, found) {
+    const refusal = /information not available/i.test(answer);
+    const checked = refusal
+        ? { supported: false, text: "", removed: 0 }
+        : await verifyAnswer(answer, found.context, { embed: (texts) => rag.embed(texts) });
+    if (!checked.supported) {
+        return { answer: NOT_AVAILABLE, found: false, sources: [], references: [], removedSentences: checked.removed };
+    }
+    const used = citedChunks(checked.text, found.hits || []);
+    return {
+        answer: checked.text,
+        found: true,
+        sources: [...new Set(used.map((h) => h.file))],
+        references: found.mode === "semantic" ? toReferences(used) : [],
+        removedSentences: checked.removed
+    };
+}
 
 /** Format retrieved chunks as numbered context blocks. */
 function formatChunks(chunks) {
@@ -288,21 +325,17 @@ async function retrieve(question) {
             const hits = await rag.search(question, RAG_TOP_K, RAG_MIN_SCORE);
             return {
                 mode: "semantic",
+                hits,
                 context: formatChunks(hits),
                 sources: [...new Set(hits.map((h) => h.file))],
-                references: hits.map((h) => ({
-                    file: h.file,
-                    chunk: h.chunk,
-                    score: Math.round(h.score * 1000) / 1000,
-                    preview: h.text.slice(0, 200)
-                }))
+                references: toReferences(hits)
             };
         } catch (err) {
             console.error(`Semantic search unavailable, using keyword search: ${err.message}`);
         }
     }
     const found = searchKnowledge(question);
-    return { mode: "keyword", context: found.context, sources: found.sources, references: [] };
+    return { mode: "keyword", hits: found.hits, context: found.context, sources: found.sources, references: [] };
 }
 
 /** Explaining one uploaded file. */
@@ -426,14 +459,17 @@ app.post("/chat", async (req, res, next) => {
 
         console.log(`QUESTION (${found.mode}): ${question.slice(0, 120)}`);
         const answer = await askOllama(prompt);
-        res.json({
-            answer,
-            sources,
-            references: found.references,
-            truncated,
-            found: hasFile || Boolean(found.context),
-            retrieval: found.mode
-        });
+
+        if (hasFile) {
+            // Explaining a whole file: the file itself is the evidence, no sentence filtering.
+            return res.json({ answer, sources, references: found.references, truncated, found: true, retrieval: found.mode });
+        }
+
+        const grounded = await groundAnswer(answer, found);
+        if (grounded.removedSentences) {
+            console.log(`Removed ${grounded.removedSentences} unsupported sentence(s) from the answer.`);
+        }
+        res.json({ ...grounded, truncated, retrieval: found.mode });
     } catch (err) {
         next(err);
     }

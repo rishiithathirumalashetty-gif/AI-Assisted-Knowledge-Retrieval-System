@@ -26,6 +26,16 @@ function fakeEmbedding(text) {
     return v;
 }
 
+// Behaves like a grounded model: answers with the first sentence of the first excerpt.
+// With fabricate=true it answers from "outside knowledge" instead.
+let fabricate = false;
+function fakeAnswer(prompt) {
+    if (!String(prompt || "").includes("DOCUMENT EXCERPTS")) return "FAKE-ANSWER";
+    if (fabricate) return "SPI uses a master and slave with a separate clock line and chip select.\n\nSources:\ncan-bus.pdf";
+    const excerpt = prompt.split(/FILE NAME: [^\n]*\n=+\n\n/)[1] || "";
+    const firstLine = excerpt.split("\n").find((l) => l.trim().length > 20) || excerpt;
+    return `${firstLine.trim()}\n\nSources:\nmade-up-file.pdf`;
+}
 let lastPrompt = "";
 let embedCalls = 0;
 let embedBroken = false;
@@ -42,7 +52,7 @@ const fakeOllama = http.createServer((req, res) => {
             return res.end(JSON.stringify({ embeddings: json.input.map(fakeEmbedding) }));
         }
         lastPrompt = json.prompt;
-        res.end(JSON.stringify({ response: "FAKE-ANSWER" }));
+        res.end(JSON.stringify({ response: fakeAnswer(lastPrompt) }));
     });
 });
 
@@ -162,7 +172,7 @@ test("a question with no relevant document is answered without calling the model
     assert.strictEqual(body.retrieval, "semantic");
     assert.strictEqual(body.found, false);
     assert.deepStrictEqual(body.sources, []);
-    assert.strictEqual(body.answer, "Information not available in institutional database.");
+    assert.strictEqual(body.answer, "Information not available in the uploaded documents.");
     assert.strictEqual(lastPrompt, "", "no generation request was sent");
 });
 
@@ -242,4 +252,26 @@ test("re-uploading a file when embeddings fail removes its old embeddings", asyn
     }
     const empty = (await (await fetch(base + "/files")).json()).files.find((f) => f.name === "empty.txt");
     assert.deepStrictEqual([empty.indexed, empty.chunks], [true, 0], "empty file counts as indexed with no text");
+});
+
+test("citations come from retrieval, never from file names the model writes", async () => {
+    // The fake model ends every answer with "Sources: made-up-file.pdf".
+    const body = await (await post("/chat", { question: "Which identifier wins CAN bus arbitration?" })).json();
+    assert.strictEqual(body.found, true);
+    assert.ok(!body.sources.includes("made-up-file.pdf"));
+    assert.ok(!/made-up-file/.test(body.answer), "the model's source list is removed from the answer");
+    assert.ok(body.references.every((r) => typeof r.score === "number" && r.file === "can-bus.pdf"));
+});
+
+test("a fabricated answer is replaced by a refusal with no citations", async () => {
+    fabricate = true;
+    try {
+        const body = await (await post("/chat", { question: "Which identifier wins CAN bus arbitration?" })).json();
+        assert.strictEqual(body.answer, "Information not available in the uploaded documents.");
+        assert.strictEqual(body.found, false);
+        assert.deepStrictEqual(body.sources, []);
+        assert.deepStrictEqual(body.references, []);
+    } finally {
+        fabricate = false;
+    }
 });
