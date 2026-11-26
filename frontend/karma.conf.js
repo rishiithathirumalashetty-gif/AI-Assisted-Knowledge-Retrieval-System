@@ -38,6 +38,10 @@ module.exports = function (config) {
     logLevel: config.LOG_INFO,
     autoWatch: true,
     browsers: ['Chrome'],
+    // Headless Chrome for CI and containers: npm test -- --watch=false --browsers=ChromeHeadlessCI
+    customLaunchers: {
+      ChromeHeadlessCI: { base: 'ChromeHeadless', flags: ['--no-sandbox'] }
+    },
     singleRun: false,
     restartOnFileChange: true
   });
