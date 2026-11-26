@@ -18,7 +18,7 @@
  * Everything runs locally, so no document leaves the machine.
  *
  * Configuration (all optional) is read from environment variables, see
- * .env.example: PORT, OLLAMA_URL, OLLAMA_MODEL, OLLAMA_EMBED_MODEL, CORS_ORIGIN,
+ * .env.example: PORT, OLLAMA_URL, OLLAMA_MODEL, OLLAMA_EMBED_MODEL, OLLAMA_TIMEOUT_MS, CORS_ORIGIN,
  * KNOWLEDGE_DIR, VECTOR_STORE, RAG_TOP_K, RAG_MIN_SCORE.
  */
 "use strict";
@@ -49,7 +49,9 @@ const KNOWLEDGE_DIR = process.env.KNOWLEDGE_DIR || path.join(__dirname, "knowled
 const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
 const VECTOR_STORE = process.env.VECTOR_STORE || path.join(KNOWLEDGE_DIR, ".vector-store.json");
 const RAG_TOP_K = Number(process.env.RAG_TOP_K) || 4;            // chunks sent to the model
-const RAG_MIN_SCORE = Number(process.env.RAG_MIN_SCORE) || 0.3;  // minimum cosine similarity
+// Minimum cosine similarity. Measured with nomic-embed-text: questions answered by a document
+// scored 0.62-0.84, unrelated questions 0.33-0.42, so 0.5 keeps the first and drops the second.
+const RAG_MIN_SCORE = Number(process.env.RAG_MIN_SCORE) || 0.5;
 
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;     // 2 MB per text/code file
 const MAX_PDF_BYTES = 10 * 1024 * 1024;       // 10 MB per PDF
@@ -57,7 +59,8 @@ const CHUNK_SIZE = 5000;                  // characters per searchable chunk
 const TOP_CHUNKS = 3;                     // best-matching chunks sent to the model
 const MAX_FILE_CONTEXT = 12000;           // characters of an uploaded file sent to the model
 const MAX_QUESTION_LENGTH = 2000;
-const OLLAMA_TIMEOUT_MS = 120000;
+// A 7B model on a laptop CPU can need several minutes for a long answer.
+const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS) || 600000;
 
 // Only plain-text source and document files are accepted.
 const ALLOWED_EXTENSIONS = new Set([

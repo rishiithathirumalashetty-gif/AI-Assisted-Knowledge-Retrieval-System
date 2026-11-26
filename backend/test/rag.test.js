@@ -53,6 +53,8 @@ test.before(async () => {
     await new Promise((r) => fakeOllama.listen(0, "127.0.0.1", r));
     process.env.KNOWLEDGE_DIR = tmp;
     process.env.OLLAMA_URL = `http://127.0.0.1:${fakeOllama.address().port}`;
+    // The fake bag-of-words embeddings score lower than a real model, so use a lower threshold.
+    process.env.RAG_MIN_SCORE = "0.3";
     delete require.cache[require.resolve("../server")];
     const mod = require("../server");
     rag = mod.rag;

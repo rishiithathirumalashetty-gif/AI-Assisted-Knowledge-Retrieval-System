@@ -206,7 +206,7 @@ class RagStore {
      * Semantic search: embed the question and return the `topK` chunks with the highest cosine
      * similarity that also reach `minScore`.
      */
-    async search(question, topK = 4, minScore = 0.3) {
+    async search(question, topK = 4, minScore = 0.5) {
         if (!this.chunkCount) return [];
         const [q] = await this.embed([question]);
         const scored = [];

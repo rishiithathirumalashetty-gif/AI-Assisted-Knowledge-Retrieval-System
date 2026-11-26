@@ -68,7 +68,7 @@ A separate vector database would be overkill for a few hundred documents on one 
 
 1. Greetings and thanks are answered conversationally, without retrieval.
 2. The question is embedded with the same model, and every stored chunk is scored by cosine similarity.
-3. The best 4 chunks with a score of at least 0.3 are kept (`RAG_TOP_K`, `RAG_MIN_SCORE`).
+3. The best 4 chunks with a score of at least 0.5 are kept (`RAG_TOP_K`, `RAG_MIN_SCORE`).
 4. If none qualify, the API answers "Information not available in institutional database." without calling the model.
 5. Otherwise the chunks are numbered, labelled with their file names and put into a prompt that tells the model to answer only from them and to list the files it used.
 6. The response contains the answer, the source files and a `references` list (file, chunk number, score, preview), which the UI shows under the answer.
@@ -164,13 +164,26 @@ All settings are optional. See `backend/.env.example`. The server reads them fro
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Where Ollama is running |
 | `OLLAMA_MODEL` | `qwen2.5-coder:7b` | Model used for answers |
 | `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Model used for embeddings. If you change it, the index is rebuilt on the next start |
+| `OLLAMA_TIMEOUT_MS` | `600000` | How long to wait for an answer (10 minutes, for CPU-only machines) |
 | `CORS_ORIGIN` | `http://localhost:4200` | Frontend origin allowed to call the API |
 | `KNOWLEDGE_DIR` | `backend/knowledge` | Folder for uploaded files |
 | `VECTOR_STORE` | `<KNOWLEDGE_DIR>/.vector-store.json` | Where the embeddings are saved |
 | `RAG_TOP_K` | `4` | Number of chunks given to the model |
-| `RAG_MIN_SCORE` | `0.3` | Minimum cosine similarity for a chunk to count as relevant |
+| `RAG_MIN_SCORE` | `0.5` | Minimum cosine similarity for a chunk to count as relevant (see below) |
 
 If you change the backend port, also change `apiUrl` in `frontend/src/environments/environment.ts`.
+
+### How the 0.5 threshold was chosen
+
+We measured cosine similarity with `nomic-embed-text` on sample STM32 notes, using the same 1,000-character chunks the app uses:
+
+| Kind of question | Example | Best score |
+| --- | --- | --- |
+| Answered in the documents | "How is the PWM duty cycle calculated?" | 0.62 to 0.84 |
+| Unrelated | "What is the capital of France?" | 0.33 to 0.42 |
+| Same subject, not covered | "How does the I2C protocol address devices?" | 0.48 to 0.61 |
+
+With 0.5, unrelated questions are rejected before the model is called. Questions on the same subject that the documents don't cover can still pass, so the prompt also tells the model to answer "Information not available" when the context doesn't contain the answer. `npm run smoke` checks both cases. With a different embedding model the scores change, so measure again before changing `OLLAMA_EMBED_MODEL`.
 
 ## Troubleshooting
 
@@ -184,7 +197,7 @@ If you change the backend port, also change `apiUrl` in `frontend/src/environmen
 | A PDF shows "No text could be extracted" | It is probably a scanned image. OCR is not supported. |
 | `npm start` in `frontend/` fails with `ERR_OSSL_EVP_UNSUPPORTED` | Set `NODE_OPTIONS=--openssl-legacy-provider` as shown above. |
 | `npm install` in `backend/` warns about the Node version | Install Node.js 20.16 or newer. |
-| Answers are slow | 7B models are slow on a CPU. Try a smaller model such as `qwen2.5-coder:1.5b`. |
+| Answers are slow or time out | Without a GPU, `qwen2.5-coder:7b` can take several minutes per answer. The backend waits up to 10 minutes (`OLLAMA_TIMEOUT_MS`). For a faster demo, use a smaller model: `ollama pull qwen2.5-coder:1.5b` and set `OLLAMA_MODEL=qwen2.5-coder:1.5b` in `backend/.env`. |
 
 ## API
 

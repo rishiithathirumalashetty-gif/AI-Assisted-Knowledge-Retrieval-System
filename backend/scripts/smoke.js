@@ -62,8 +62,15 @@ async function main() {
     }
 
     const notInDocs = await post("/chat", { question: "What is the boiling point of mercury?" });
-    report("Question not in documents is refused", notInDocs.body.found === false,
+    report("Unrelated question is refused without calling the model", notInDocs.body.found === false,
         `answer: ${String(notInDocs.body.answer || notInDocs.body.error).slice(0, 80)}`);
+
+    // Same subject area but not covered by the documents: retrieval may find loosely related
+    // chunks, so the model itself has to say the information is not available.
+    const nearTopic = await post("/chat", { question: "How does the I2C protocol address devices?" });
+    const declined = nearTopic.status === 200 && (nearTopic.body.found === false || /not available/i.test(nearTopic.body.answer));
+    report("Related but uncovered question is declined", declined,
+        nearTopic.status === 200 ? `retrieval=${nearTopic.body.retrieval}, found=${nearTopic.body.found}: ${nearTopic.body.answer.trim().slice(0, 100)}` : nearTopic.body.error);
 
     // Clean up the sample documents so they do not stay in your knowledge base.
     for (const f of ["smoke-can-bus.pdf", "smoke-gpio.txt"]) {
