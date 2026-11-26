@@ -38,10 +38,14 @@
       </div>
       <button type="submit" class="primary" [disabled]="loading">
         <span *ngIf="!loading">Ask</span>
-        <span *ngIf="loading" class="busy"><i class="spinner"></i>Searching documents…</span>
+        <span *ngIf="loading" class="busy"><i class="spinner"></i>Answering… {{ timer.seconds }}s</span>
       </button>
     </div>
   </form>
+
+  <p class="wait-note" *ngIf="loading && timer.seconds >= 10" role="status">
+    The model runs locally. Without a GPU an answer can take up to a minute.
+  </p>
 
   <p class="error" *ngIf="error" role="alert">{{ error }}</p>
 

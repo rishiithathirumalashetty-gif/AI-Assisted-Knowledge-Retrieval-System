@@ -1,8 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 
 import { ApiService, KnowledgeFile, SourceReference } from '../api.service';
 import { AnswerSegment, errorMessage, splitAnswer } from '../answer-format';
 import { validateFile } from '../uploads/upload.component';
+import { ElapsedTimer } from '../elapsed-timer';
 
 const MAX_QUESTION = 2000;
 
@@ -12,7 +13,7 @@ const MAX_QUESTION = 2000;
   templateUrl: './chat.component.html',
   styleUrls: ['./chat.component.css']
 })
-export class ChatComponent implements OnInit {
+export class ChatComponent implements OnInit, OnDestroy {
 
   question = '';
   segments: AnswerSegment[] = [];
@@ -22,6 +23,7 @@ export class ChatComponent implements OnInit {
   retrieval = '';
   loading = false;
   error = '';
+  readonly timer = new ElapsedTimer();
 
   // Knowledge base
   files: KnowledgeFile[] = [];
@@ -37,6 +39,10 @@ export class ChatComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadFiles();
+  }
+
+  ngOnDestroy(): void {
+    this.timer.stop();
   }
 
   get unindexedCount(): number {
@@ -127,6 +133,7 @@ export class ChatComponent implements OnInit {
     this.sources = [];
     this.references = [];
     this.loading = true;
+    this.timer.start();
 
     this.apiService.ask(q).subscribe(
       (res) => {
@@ -136,10 +143,12 @@ export class ChatComponent implements OnInit {
         this.found = res.found !== false;
         this.retrieval = res.retrieval || '';
         this.loading = false;
+        this.timer.stop();
       },
       (err) => {
         this.error = errorMessage(err, 'Could not get an answer from the server.');
         this.loading = false;
+        this.timer.stop();
       }
     );
   }

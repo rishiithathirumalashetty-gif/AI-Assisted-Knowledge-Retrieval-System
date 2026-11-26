@@ -62,3 +62,5 @@ button.link:disabled { color: var(--muted); cursor: progress; }
   .kb-head { flex-direction: column; }
   .upload-btn { width: 100%; justify-content: center; }
 }
+
+.wait-note { margin: 12px 0 0; color: var(--muted); font-size: .85rem; }

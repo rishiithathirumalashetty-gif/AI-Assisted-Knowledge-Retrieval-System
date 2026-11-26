@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 
 import { ApiService } from '../api.service';
 import { AnswerSegment, errorMessage, splitAnswer } from '../answer-format';
+import { ElapsedTimer } from '../elapsed-timer';
 
 /** Must match ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES and MAX_PDF_BYTES in backend/server.js. */
 export const ALLOWED = ['.c', '.h', '.cpp', '.hpp', '.cc', '.cs', '.java', '.js', '.ts', '.py', '.go', '.rs',
@@ -29,7 +30,7 @@ export function validateFile(file: File): string {
   templateUrl: './upload.component.html',
   styleUrls: ['./upload.component.css']
 })
-export class UploadComponent {
+export class UploadComponent implements OnDestroy {
 
   selectedFile: File | null = null;
   segments: AnswerSegment[] = [];
@@ -41,6 +42,7 @@ export class UploadComponent {
   error = '';
   dragging = false;
   copied = false;
+  readonly timer = new ElapsedTimer();
 
   constructor(private apiService: ApiService) { }
 
@@ -92,6 +94,7 @@ export class UploadComponent {
     this.sources = [];
     this.rawAnswer = '';
     this.loading = true;
+    this.timer.start();
     this.stage = 'uploading';
 
     this.apiService.uploadFile(formData).subscribe(
@@ -132,7 +135,12 @@ export class UploadComponent {
     return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }
 
+  ngOnDestroy(): void {
+    this.timer.stop();
+  }
+
   private finish(): void {
+    this.timer.stop();
     this.loading = false;
     this.stage = '';
   }

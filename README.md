@@ -4,6 +4,8 @@ A local AI assistant that explains source code and answers questions from your o
 
 > Built during my one-month internship at Instrutel Systems Pvt. Ltd. (May 2026). My part was the Angular frontend, the connection to the Node.js REST APIs and the integration with the local Ollama model. This repository contains only my own work and no company data. The knowledge folder is empty and git-ignored.
 
+For architecture notes, design trade-offs, likely interview questions and a 3-minute demo script, see [docs/INTERVIEW_GUIDE.md](docs/INTERVIEW_GUIDE.md).
+
 ## Problem statement
 
 Reading unfamiliar embedded-systems or driver code is slow, and general chatbots answer from the internet rather than from the documents a team actually uses. Pasting proprietary code into a hosted AI service is also not always allowed. This project shows one way around both: a retrieval step feeds the model only your own files, and the model runs locally.
@@ -21,7 +23,7 @@ Reading unfamiliar embedded-systems or driver code is slow, and general chatbots
 - **Clear error handling:** the UI tells you whether the backend is down, Ollama is down, a model is missing or the model timed out.
 - **Status indicator** in the header shows backend and Ollama health.
 - Responsive layout, copy-to-clipboard for answers, code blocks rendered safely (no `innerHTML`).
-- Tests: 30 backend tests (API, RAG pipeline, configuration) and 12 frontend unit tests. They use a fake Ollama server, so you don't need to download a model to run them.
+- Tests: 30 backend tests (API, RAG pipeline, configuration) and 13 frontend unit tests. They use a fake Ollama server, so you don't need to download a model to run them.
 
 ## Tech stack
 

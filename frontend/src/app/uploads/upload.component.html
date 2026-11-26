@@ -15,7 +15,7 @@
   <div class="actions">
     <button type="button" class="primary" (click)="uploadFile()" [disabled]="loading || !selectedFile">
       <span *ngIf="!loading">Explain code</span>
-      <span *ngIf="loading" class="busy"><i class="spinner"></i>{{ stage === 'uploading' ? 'Uploading…' : 'Analysing with the AI model…' }}</span>
+      <span *ngIf="loading" class="busy"><i class="spinner"></i>{{ stage === 'uploading' ? 'Uploading…' : 'Analysing with the AI model… ' + timer.seconds + 's' }}</span>
     </button>
     <button type="button" class="ghost" *ngIf="selectedFile && !loading" (click)="clearFile()">Clear</button>
   </div>
