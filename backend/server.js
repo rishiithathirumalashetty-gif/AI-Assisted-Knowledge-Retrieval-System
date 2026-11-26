@@ -42,11 +42,12 @@ try {
 }
 
 const PORT = Number(process.env.PORT) || 3000;
-const OLLAMA_URL = (process.env.OLLAMA_URL || "http://127.0.0.1:11434").replace(/\/$/, "");
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5-coder:7b";
+const OLLAMA_URL = (process.env.OLLAMA_URL || "http://127.0.0.1:11434").trim().replace(/\/$/, "");
+// trim(): on Windows `set NAME=value && ...` keeps a trailing space in the value.
+const OLLAMA_MODEL = (process.env.OLLAMA_MODEL || "qwen2.5-coder:7b").trim();
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:4200";
 const KNOWLEDGE_DIR = process.env.KNOWLEDGE_DIR || path.join(__dirname, "knowledge");
-const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
+const OLLAMA_EMBED_MODEL = (process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text").trim();
 const VECTOR_STORE = process.env.VECTOR_STORE || path.join(KNOWLEDGE_DIR, ".vector-store.json");
 const RAG_TOP_K = Number(process.env.RAG_TOP_K) || 4;            // chunks sent to the model
 // Minimum cosine similarity. Measured with nomic-embed-text: questions answered by a document
