@@ -233,6 +233,21 @@ web/                   Earlier standalone chat page (older API, kept for referen
 docs/screenshots/      Screenshots used in this README
 ```
 
+## Verified with real models
+
+Checked on a Windows laptop without a GPU (Ollama 0.40.18, `qwen2.5-coder:7b` and `nomic-embed-text`, CPU only, about 2.5 tokens per second). The grounded prompt was sent to the real model with the chunks that retrieval returned:
+
+| Question | Retrieved (score) | Time | Answer |
+| --- | --- | --- | --- |
+| Which identifier wins CAN bus arbitration? | `can-bus.pdf` (0.76) | 20 s | "The identifier with the lowest value wins CAN bus arbitration." |
+| How do I configure a GPIO pin as output? | `gpio-notes.txt` (0.81) | 51 s | The exact steps from the file, with "Sources: gpio-notes.txt" |
+| How does an SPI bus work? (not in the documents) | `can-bus.pdf` (0.61) | 8 s | "Information not available in institutional database." |
+| What is the boiling point of mercury? | nothing above 0.5 | instant | Answered by the server without calling the model |
+
+The earlier prompt, which asked for a 10-section answer, took 348 s for the first question and padded it with code and facts that were not in the document. That is why the question prompt was changed.
+
+![Real model check](docs/screenshots/07-real-model-check.png)
+
 ## Screenshots
 
 These screenshots were taken from the running app with the answer model replaced by a small stand-in server, so the answer text is a placeholder, not real model output. Everything else is real. In the RAG screenshot, the PDF was actually uploaded, extracted, chunked, embedded (by the stand-in) and found by similarity search. Screenshots with a real model are still to be added.

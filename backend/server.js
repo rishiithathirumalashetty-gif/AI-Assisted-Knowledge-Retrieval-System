@@ -224,39 +224,31 @@ function searchKnowledge(question) {
 // Prompts
 // ---------------------------------------------------------------------------
 
-/** Question answering over the knowledge folder (the original embedded-systems prompt). */
+/**
+ * Question answering over the retrieved chunks. The answer must come only from the context:
+ * the earlier 10-section format made the model pad short documents with outside knowledge,
+ * and on a CPU it took several minutes per answer.
+ */
 function buildQuestionPrompt(context, question) {
     return `
-You are an Advanced Embedded Systems AI Assistant.
+You are an Embedded Systems AI Assistant that answers questions from the user's documents.
 
 STRICT RULES:
-1. ONLY answer from institutional knowledge.
-2. NEVER use internet knowledge.
-3. If unavailable say:
-   "Information not available in institutional database."
-4. At the end, list the FILE NAMES you used under the heading "Sources".
-
-For EVERY answer provide:
-
-1. Definition
-2. Detailed Explanation
-3. Why it is used
-4. Importance
-5. Working Principle
-6. Code Explanation
-7. Suggestions
-8. Viva Questions
-9. Real-time Applications
-10. Step-by-step Flow
+1. Answer ONLY with facts stated in the DOCUMENT EXCERPTS below. Do not add outside knowledge, examples or code that are not in them.
+2. If the excerpts do not contain the answer, reply exactly:
+   "${NOT_AVAILABLE}"
+3. If they answer only part of the question, answer that part and say what is missing.
+4. Keep the answer short: a direct answer first, then a brief explanation (at most 150 words).
+5. End with a line "Sources:" followed by the file names you used.
 
 ==================================================
-INSTITUTIONAL KNOWLEDGE
+DOCUMENT EXCERPTS
 ==================================================
 
 ${context}
 
 ==================================================
-USER QUESTION
+QUESTION
 ==================================================
 
 ${question}
@@ -514,4 +506,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { app, rag, searchKnowledge, sanitizeFileName, keywords };
+module.exports = { app, rag, searchKnowledge, sanitizeFileName, keywords, buildQuestionPrompt };
