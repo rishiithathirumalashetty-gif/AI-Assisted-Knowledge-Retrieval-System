@@ -44,3 +44,28 @@ test("server starts with invalid settings and Ollama unreachable", async () => {
         fs.rmSync(dir, { recursive: true, force: true });
     }
 });
+
+test("settings in backend/.env are used, shell variables win", async (t) => {
+    const envPath = path.join(__dirname, "..", ".env");
+    if (fs.existsSync(envPath)) return t.skip("a real backend/.env exists; not overwriting it");
+    const port = 40000 + Math.floor(Math.random() * 1000);
+    fs.writeFileSync(envPath, `PORT=${port}\nOLLAMA_MODEL=model-from-env-file\nOLLAMA_EMBED_MODEL=embed-from-env-file\nOLLAMA_URL=http://127.0.0.1:9\n`);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cfg-"));
+    const env = { ...process.env, KNOWLEDGE_DIR: dir, OLLAMA_EMBED_MODEL: "embed-from-shell" };
+    delete env.PORT; delete env.OLLAMA_MODEL; delete env.OLLAMA_URL;
+    const child = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], { env, stdio: "ignore" });
+    try {
+        let health;
+        for (let i = 0; i < 50 && !health; i++) {
+            await new Promise((r) => setTimeout(r, 100));
+            health = await fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json()).catch(() => undefined);
+        }
+        assert.ok(health, "server used PORT from .env");
+        assert.strictEqual(health.model, "model-from-env-file");
+        assert.strictEqual(health.embedModel, "embed-from-shell");
+    } finally {
+        child.kill();
+        fs.rmSync(envPath, { force: true });
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});

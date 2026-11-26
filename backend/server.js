@@ -34,6 +34,13 @@ const { RagStore, extractText } = require("./rag");
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
+// Read backend/.env if it exists. Variables already set in the shell take precedence.
+try {
+    process.loadEnvFile(path.join(__dirname, ".env"));
+} catch (err) {
+    if (err.code !== "ENOENT") console.error(`Could not read .env: ${err.message}`);
+}
+
 const PORT = Number(process.env.PORT) || 3000;
 const OLLAMA_URL = (process.env.OLLAMA_URL || "http://127.0.0.1:11434").replace(/\/$/, "");
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5-coder:7b";
