@@ -143,6 +143,17 @@ npm run build
 
 The backend tests start a small fake Ollama server. It returns deterministic bag-of-words embeddings, so chunking, PDF extraction, similarity search, source references, the keyword fallback and error handling are all exercised without downloading a model. Answer quality with a real model is not covered by the automated tests.
 
+### Checking it with your real Ollama
+
+With Ollama running and the backend started (`npm start`), run this in a second terminal:
+
+```bash
+cd backend
+npm run smoke
+```
+
+It uploads a sample PDF and a text file, asks a question that is answered in them and one that is not, prints the model's answer, and reports PASS or FAIL for each step. The sample files are removed afterwards.
+
 ## Configuration
 
 All settings are optional. See `backend/.env.example`. The server reads them from the environment (for example `PORT=4000 npm start`). The project needs no API keys. Never commit a real `.env` file; it is git-ignored.

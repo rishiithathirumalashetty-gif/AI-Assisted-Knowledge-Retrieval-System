@@ -17,7 +17,7 @@ cd backend && npm test
 cd ../frontend && npm test -- --watch=false --browsers=ChromeHeadlessCI && npm run build
 ```
 
-If you changed how retrieval or prompts work, also try it by hand with Ollama running: upload a document, ask a question whose answer is in it, and ask one whose answer is not.
+If you changed how retrieval or prompts work, also run `npm run smoke` in `backend/` with Ollama and the backend running, and try the UI by hand: upload a document, ask a question whose answer is in it, and ask one whose answer is not.
 
 ## Conventions
 
