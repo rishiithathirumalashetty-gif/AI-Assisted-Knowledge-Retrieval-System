@@ -34,7 +34,8 @@ Angular (4200) ──REST/JSON──▶ Express (3000) ──HTTP──▶ Ollam
 5. **Store:** vectors plus chunk text go into one JSON file, written atomically (write a temp file, then rename). File size and modification time are stored so unchanged files are not re-embedded.
 6. **Retrieve:** the question is embedded the same way. Every chunk is scored by cosine similarity, and the top 4 above 0.5 are kept.
 7. **Generate:** the chunks are numbered and labelled with file names in a prompt that says "answer only from these excerpts, otherwise say it is not available", then sent to `/api/generate`.
-8. **Respond:** answer, source files, and references (file, chunk number, score, preview).
+8. **Verify:** `grounding.js` keeps an answer sentence only if every number and code identifier in it appears in the retrieved text, and either half its content words do or its embedding is at least 0.75 similar to a retrieved sentence. If nothing survives, the answer is "Information not available in the uploaded documents."
+9. **Cite:** the model's own source list is removed. Citations are the retrieved chunks the final answer actually uses, with their real scores.
 
 ## Decisions and trade-offs
 
@@ -54,7 +55,9 @@ Angular (4200) ──REST/JSON──▶ Express (3000) ──HTTP──▶ Ollam
 
 **What does an embedding represent?** A vector where texts with similar meaning point in similar directions. Cosine similarity measures the angle between two vectors, so it ignores length.
 
-**How do you stop hallucination?** In three layers. First, a similarity threshold drops irrelevant chunks. Second, if nothing is left, the server answers "not available" without calling the model. Third, the prompt forbids outside knowledge and requires a fixed refusal sentence. This was checked with the real model: an SPI question against CAN-only documents was refused.
+**How do you stop hallucination?** In four layers. First, a similarity threshold drops irrelevant chunks. Second, if nothing is left, the server refuses without calling the model. Third, the prompt forbids outside knowledge. Fourth, the answer is verified sentence by sentence against the retrieved text (exact numbers and identifiers, word overlap, embedding similarity for paraphrases), and citations come only from retrieval. Layer four exists because testing a 1.5B model showed it invented an SPI answer and cited the CAN document.
+
+**Why not just trust embedding similarity for verification?** It was measured. A fabricated "25 mA" sentence scored 0.75 against the GPIO notes, higher than some correct paraphrases. Similarity measures topic, not truth, so numbers and identifiers are checked exactly and the similarity cut-off is set above every measured fabrication.
 
 **Why chunk with overlap?** Without overlap, a fact split across two chunks may not be fully present in either one.
 

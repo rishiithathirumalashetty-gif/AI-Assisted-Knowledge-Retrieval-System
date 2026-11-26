@@ -15,7 +15,8 @@ Reading unfamiliar embedded-systems or driver code is slow, and general chatbots
 - **Explain a file:** drop in a source file (C, C++, Python, JavaScript, Java and about 20 other text formats) or a PDF and get a structured explanation: purpose, walkthrough, key functions, possible issues.
 - **Ask your documents (RAG):** upload PDFs or text files to the knowledge base and ask questions about them. Documents are split into chunks and embedded with a local embedding model, and each answer is built from the chunks closest in meaning to the question.
 - **Source references:** every answer lists the documents and chunks it used, with a similarity score and a short preview.
-- **No made-up answers:** if no chunk is similar enough to the question, the server replies that the information is not available and does not call the model at all.
+- **No made-up answers:** if no chunk is similar enough to the question, the server replies "Information not available in the uploaded documents." without calling the model. Every generated answer is also checked sentence by sentence against the retrieved text, and unsupported sentences are removed (see "Answer verification").
+- **Citations from retrieval only:** the model's own source list is discarded. Sources are built from the retrieved chunks the final answer actually uses, with their real similarity scores.
 - **Keyword fallback:** if the embedding model is not installed, documents are still saved and questions are answered with keyword search. The UI labels which retrieval method was used.
 - **Small talk:** greetings such as "hello" or "thanks" get a normal reply instead of a document search.
 - **Local and private:** runs on Ollama (`qwen2.5-coder:7b` for answers and `nomic-embed-text` for embeddings by default). No API keys, no cloud services.
@@ -23,7 +24,7 @@ Reading unfamiliar embedded-systems or driver code is slow, and general chatbots
 - **Clear error handling:** the UI tells you whether the backend is down, Ollama is down, a model is missing or the model timed out.
 - **Status indicator** in the header shows backend and Ollama health.
 - Responsive layout, copy-to-clipboard for answers, code blocks rendered safely (no `innerHTML`).
-- Tests: 30 backend tests (API, RAG pipeline, configuration) and 13 frontend unit tests. They use a fake Ollama server, so you don't need to download a model to run them.
+- Tests: 41 backend tests (API, RAG pipeline, answer verification, citations, configuration) and 13 frontend unit tests. They use a fake Ollama server, so you don't need to download a model to run them.
 
 ## Tech stack
 
@@ -72,8 +73,12 @@ A separate vector database would be overkill for a few hundred documents on one 
 2. The question is embedded with the same model, and every stored chunk is scored by cosine similarity.
 3. The best 4 chunks with a score of at least 0.5 are kept (`RAG_TOP_K`, `RAG_MIN_SCORE`).
 4. If none qualify, the API answers "Information not available in institutional database." without calling the model.
-5. Otherwise the chunks are numbered, labelled with their file names and put into a prompt that tells the model to answer only from them and to list the files it used.
-6. The response contains the answer, the source files and a `references` list (file, chunk number, score, preview), which the UI shows under the answer.
+5. Otherwise the chunks are numbered, labelled with their file names and put into a prompt that tells the model to answer only from them.
+6. **Answer verification** (`backend/grounding.js`): each sentence of the answer is kept only if
+   - every number and code identifier in it appears in the retrieved text, so invented values like "25 mA" or a made-up function name are rejected, and
+   - at least half of its content words appear in the retrieved text, or, for paraphrases, its embedding has a similarity of at least 0.75 with a sentence of the retrieved text.
+   If no sentence survives, the answer becomes "Information not available in the uploaded documents."
+7. **Citations:** any "Sources" list the model wrote is removed. The response's `sources` and `references` (file, chunk number, similarity score, preview) are built only from retrieved chunks whose words the final answer uses.
 
 If embeddings can't be created (for example because `nomic-embed-text` was not pulled), uploads still work and questions fall back to the original keyword search. The response then has `retrieval: "keyword"`, and the UI shows a "Keyword search" label, so the two modes can't be confused.
 
@@ -252,6 +257,23 @@ The earlier prompt, which asked for a 10-section answer, took 348 s for the firs
 
 ![Real model check](docs/screenshots/07-real-model-check.png)
 
+### Answer verification on real models
+
+After adding verification, the full pipeline ran on the same laptop: real retrieval over three documents (`can-bus.pdf`, `gpio-notes.txt`, `uart-guide.pdf`), a real model answer, then verification and citations.
+
+| Model | Question | Time | Shown to the user | Citation |
+| --- | --- | --- | --- | --- |
+| 7B | CAN arbitration | 24 s | "The identifier with the lowest value wins CAN bus arbitration." | `can-bus.pdf` chunk 1 (0.76) |
+| 7B | GPIO output | 33 s | All three steps with the exact settings; nothing removed | `gpio-notes.txt` chunk 1 (0.81) |
+| 7B | SPI (not covered) | 5 s | "Information not available in the uploaded documents." | none |
+| 1.5B | CAN | 7 s | Correct | `can-bus.pdf` chunk 1 (0.76) |
+| 1.5B | GPIO | 18 s | Correct; 2 unsupported sentences removed | `gpio-notes.txt` chunk 1 (0.81) |
+| 1.5B | SPI | 2 s | Refused in this run. It fabricated an answer in the earlier run, so 7B stays the default | none |
+
+How the paraphrase cut-off was chosen: correct paraphrases scored 0.49 to 0.83 against the closest document sentence, and same-topic fabrications that pass the number rule scored up to 0.65. With 0.75, all 7 fabrication test sentences are rejected and 3 of 5 paraphrases are kept. The other two are dropped on purpose, because a lower cut-off would let fabrications through.
+
+![Verified pipeline](docs/screenshots/08-verified-pipeline.png)
+
 ## Screenshots
 
 These screenshots were taken from the running app with the answer model replaced by a small stand-in server, so the answer text is a placeholder, not real model output. Everything else is real. In the RAG screenshot, the PDF was actually uploaded, extracted, chunked, embedded (by the stand-in) and found by similarity search. Screenshots with a real model are still to be added.
@@ -281,7 +303,8 @@ These screenshots were taken from the running app with the answer model replaced
 - Each question is answered on its own; there is no conversation memory.
 - There are no user accounts or authentication. Run it locally, not on a public server.
 - Uploading a file with an existing name replaces the earlier file and its embeddings.
-- The automated tests use a fake Ollama, so the pipeline has not been checked against a real model in CI.
+- The automated tests use a fake Ollama. Real-model checks are run with `npm run smoke` and recorded above, not in CI.
+- Answer verification is conservative: some correct paraphrases are removed. It checks words, numbers and embedding similarity, not logical meaning, so a sentence that reuses the document's words in a wrong way could still pass.
 
 ## Future enhancements
 
