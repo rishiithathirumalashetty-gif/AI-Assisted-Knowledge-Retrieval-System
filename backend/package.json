@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
-    "smoke": "node scripts/smoke-test.js"
+    "smoke": "node scripts/smoke.js"
   },
   "author": "Thirumala Shetty Rishitha",
   "license": "ISC",
