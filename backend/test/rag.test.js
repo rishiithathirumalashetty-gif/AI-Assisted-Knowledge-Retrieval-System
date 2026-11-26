@@ -223,3 +223,21 @@ test("a document whose text cannot be read does not crash the server", async () 
     const health = await fetch(base + "/health");
     assert.strictEqual(health.status, 200);
 });
+
+test("re-uploading a file when embeddings fail removes its old embeddings", async () => {
+    await upload("notes.txt", "The watchdog timer resets the microcontroller.");
+    assert.strictEqual(rag.chunksFor("notes.txt"), 1);
+    embedBroken = true;
+    try {
+        const body = await (await upload("notes.txt", "Completely different content about DMA.")).json();
+        assert.strictEqual(body.indexed, false);
+        assert.ok(!rag.files["notes.txt"], "stale embeddings were dropped");
+        const files = (await (await fetch(base + "/files")).json()).files;
+        const entry = files.find((f) => f.name === "notes.txt");
+        assert.strictEqual(entry.indexed, false);
+    } finally {
+        embedBroken = false;
+    }
+    const empty = (await (await fetch(base + "/files")).json()).files.find((f) => f.name === "empty.txt");
+    assert.deepStrictEqual([empty.indexed, empty.chunks], [true, 0], "empty file counts as indexed with no text");
+});

@@ -21,7 +21,7 @@ Reading unfamiliar embedded-systems or driver code is slow, and general chatbots
 - **Clear error handling:** the UI tells you whether the backend is down, Ollama is down, a model is missing or the model timed out.
 - **Status indicator** in the header shows backend and Ollama health.
 - Responsive layout, copy-to-clipboard for answers, code blocks rendered safely (no `innerHTML`).
-- Tests: 28 backend tests (API, RAG pipeline, configuration) and 12 frontend unit tests. They use a fake Ollama server, so you don't need to download a model to run them.
+- Tests: 30 backend tests (API, RAG pipeline, configuration) and 12 frontend unit tests. They use a fake Ollama server, so you don't need to download a model to run them.
 
 ## Tech stack
 

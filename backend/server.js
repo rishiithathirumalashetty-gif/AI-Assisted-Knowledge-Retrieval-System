@@ -145,6 +145,8 @@ app.post("/upload", upload.single("file"), async (req, res, next) => {
                     : "The file is empty, so there is nothing to search.";
             }
         } catch (err) {
+            // Drop embeddings of an earlier upload with the same name; they no longer match the file.
+            rag.removeFile(req.file.filename);
             indexError = err.message;
             console.error(`Indexing ${req.file.filename} failed: ${err.message}`);
         }
@@ -448,7 +450,12 @@ app.post("/chat", async (req, res, next) => {
 app.get("/files", (req, res) => {
     const files = fs.readdirSync(KNOWLEDGE_DIR)
         .filter((f) => !f.startsWith("."))
-        .map((name) => ({ name, size: fs.statSync(path.join(KNOWLEDGE_DIR, name)).size, chunks: rag.chunksFor(name) }));
+        .map((name) => ({
+            name,
+            size: fs.statSync(path.join(KNOWLEDGE_DIR, name)).size,
+            indexed: Boolean(rag.files[name]),  // false: embeddings could not be created yet
+            chunks: rag.chunksFor(name)         // 0 with indexed true: the file has no text
+        }));
     res.json({ files });
 });
 

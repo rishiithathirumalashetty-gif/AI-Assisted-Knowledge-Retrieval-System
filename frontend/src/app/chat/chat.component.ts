@@ -40,7 +40,7 @@ export class ChatComponent implements OnInit {
   }
 
   get unindexedCount(): number {
-    return this.files.filter((f) => f.chunks === 0).length;
+    return this.files.filter((f) => !f.indexed).length;
   }
 
   loadFiles(): void {

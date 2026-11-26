@@ -22,7 +22,7 @@ export interface HealthResponse {
   status: string; model: string; ollama: 'reachable' | 'unreachable';
   embedModel?: string; indexedChunks?: number;
 }
-export interface KnowledgeFile { name: string; size: number; chunks: number; }
+export interface KnowledgeFile { name: string; size: number; indexed: boolean; chunks: number; }
 
 /** Thin wrapper around the backend REST API (see backend/server.js). */
 @Injectable({

@@ -19,8 +19,9 @@ describe('ChatComponent', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
     http.expectOne((r) => r.url.endsWith('/files')).flush({ files: [
-      { name: 'can-bus.pdf', size: 1500, chunks: 2 },
-      { name: 'spi.txt', size: 40, chunks: 0 }
+      { name: 'can-bus.pdf', size: 1500, indexed: true, chunks: 2 },
+      { name: 'spi.txt', size: 40, indexed: false, chunks: 0 },
+      { name: 'empty.txt', size: 0, indexed: true, chunks: 0 }
     ] });
     fixture.detectChanges();
   });
@@ -30,7 +31,8 @@ describe('ChatComponent', () => {
     expect(text).toContain('can-bus.pdf');
     expect(text).toContain('2 chunks');
     expect(text).toContain('not indexed');
-    expect(component.unindexedCount).toBe(1);
+    expect(text).toContain('no text found');
+    expect(component.unindexedCount).toBe(1); // the empty file cannot be indexed, so it is not offered
   });
 
   it('validates the question before calling the backend', () => {

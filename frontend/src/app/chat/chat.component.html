@@ -15,7 +15,7 @@
     <ul class="doc-list" *ngIf="files.length">
       <li *ngFor="let f of files">
         <span class="doc-name">{{ f.name }}</span>
-        <span class="doc-meta" [class.warn]="f.chunks === 0">{{ f.chunks ? f.chunks + (f.chunks === 1 ? ' chunk' : ' chunks') : 'not indexed' }}</span>
+        <span class="doc-meta" [class.warn]="!f.chunks">{{ !f.indexed ? 'not indexed' : f.chunks ? f.chunks + (f.chunks === 1 ? ' chunk' : ' chunks') : 'no text found' }}</span>
       </li>
     </ul>
     <p class="hint" *ngIf="!files.length">No documents yet. Add a PDF or text file to start.</p>
