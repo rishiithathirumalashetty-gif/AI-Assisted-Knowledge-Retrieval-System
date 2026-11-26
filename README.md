@@ -92,6 +92,10 @@ If embeddings can't be created (for example because `nomic-embed-text` was not p
 - **[Ollama](https://ollama.com/download)** for Windows, macOS or Linux.
 - **Hardware:** about 8 GB of free RAM for the 7B answer model. A GPU makes answers much faster, but a CPU works. The embedding model is small (about 270 MB) and runs quickly on a CPU.
 
+### Quick start on Windows
+
+After installing Node.js and Ollama and pulling the two models (step 1 below), double-click `START-AI-ASSISTANT.bat` in the project folder. It installs the dependencies, runs the backend and frontend tests and the production build, starts the backend (port 3000) and frontend (port 4200) in their own windows, runs `npm run smoke` against your models, and opens http://localhost:4200. Output is saved in the `logs` folder.
+
 ### 1. Pull the models
 
 ```bash

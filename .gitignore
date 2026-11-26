@@ -10,3 +10,4 @@ config.js
 # Knowledge documents are local to each user; add your own files here
 backend/knowledge/*
 !backend/knowledge/.gitkeep
+logs/
