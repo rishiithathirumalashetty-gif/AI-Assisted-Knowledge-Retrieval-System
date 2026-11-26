@@ -199,7 +199,7 @@ With 0.5, unrelated questions are rejected before the model is called. Questions
 | A PDF shows "No text could be extracted" | It is probably a scanned image. OCR is not supported. |
 | `npm start` in `frontend/` fails with `ERR_OSSL_EVP_UNSUPPORTED` | Set `NODE_OPTIONS=--openssl-legacy-provider` as shown above. |
 | `npm install` in `backend/` warns about the Node version | Install Node.js 20.16 or newer. |
-| Answers are slow or time out | Without a GPU, `qwen2.5-coder:7b` can take several minutes per answer. The backend waits up to 10 minutes (`OLLAMA_TIMEOUT_MS`). For a faster demo, use a smaller model: `ollama pull qwen2.5-coder:1.5b` and set `OLLAMA_MODEL=qwen2.5-coder:1.5b` in `backend/.env`. |
+| Answers are slow or time out | Without a GPU, `qwen2.5-coder:7b` can take several minutes per answer. The backend waits up to 10 minutes (`OLLAMA_TIMEOUT_MS`). A GPU makes answers much faster. Smaller models such as `qwen2.5-coder:1.5b` are faster but were seen inventing answers to questions the documents do not cover (see "Verified with real models"). |
 
 ## API
 
@@ -245,6 +245,8 @@ Checked on a Windows laptop without a GPU (Ollama 0.40.18, `qwen2.5-coder:7b` an
 | How do I configure a GPIO pin as output? | `gpio-notes.txt` (0.81) | 51 s | The exact steps from the file, with "Sources: gpio-notes.txt" |
 | How does an SPI bus work? (not in the documents) | `can-bus.pdf` (0.61) | 8 s | "Information not available in institutional database." |
 | What is the boiling point of mercury? | nothing above 0.5 | instant | Answered by the server without calling the model |
+
+**Why not a smaller model for speed?** `qwen2.5-coder:1.5b` was tested on the same laptop with the same prompts. It is about 6 times faster (14 tokens/s, 7 to 9 s per answer), but it answered the SPI question from its own knowledge (incorrectly) and cited `can-bus.pdf` as the source. Because grounded answers matter more than speed here, the default stays `qwen2.5-coder:7b`. `npm run smoke` includes this check, so you can test any model you switch to.
 
 The earlier prompt, which asked for a 10-section answer, took 348 s for the first question and padded it with code and facts that were not in the document. That is why the question prompt was changed.
 

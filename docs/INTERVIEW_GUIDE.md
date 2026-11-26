@@ -75,4 +75,6 @@ Angular (4200) ──REST/JSON──▶ Express (3000) ──HTTP──▶ Ollam
 5. Ask something unrelated. It is refused instantly, without calling the model.
 6. Switch to **Explain a file** and explain a short source file.
 
-Tip: on a laptop without a GPU, answers take 20 to 60 seconds. Warm the model up with one question before the interview, or set `OLLAMA_MODEL=qwen2.5-coder:1.5b` for faster answers.
+Tip: on a laptop without a GPU, answers take 20 to 60 seconds. Ask one question before the interview so the model is already loaded into memory. Avoid switching to `qwen2.5-coder:1.5b` for speed: in testing it invented an answer and a citation for a question the documents did not cover.
+
+**Why not a smaller model?** It was measured: 1.5B is about 6 times faster on the same CPU, but it fabricated an SPI explanation and cited the CAN document. 7B refused correctly. Grounding was more important than speed.
